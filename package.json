@@ -1,0 +1,14 @@
+{
+  "name": "plantilla-maestra-appsscript",
+  "version": "1.0.0",
+  "description": "Plantilla profesional para Google Apps Script",
+  "scripts": {
+    "lint": "eslint src/**/*.gs",
+    "format": "prettier --write src/**/*.{gs,html,json}"
+  },
+  "devDependencies": {
+    "@types/google-apps-script": "^1.0.83",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5"
+  }
+}

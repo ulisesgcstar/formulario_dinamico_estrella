@@ -1,0 +1,9 @@
+# No subir credenciales de Google
+.clasp.json
+creds.json
+
+# No subir carpetas de herramientas pesadas
+node_modules/
+
+# Archivos temporales del sistema
+.DS_Store

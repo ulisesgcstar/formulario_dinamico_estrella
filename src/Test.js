@@ -15,3 +15,20 @@ function testConfig() {
         Logger.log('❌ Error en la prueba: ' + error.message);
     }
 }
+
+/**
+ * Prueba la sincronización de listas desplegables.
+ * Verifica la conexión entre CAT_DESPLEGABLES y el Formulario.
+ */
+function testSincronizarDesplegables() {
+    try {
+        Logger.log('Iniciando prueba de sincronización...');
+
+        // Llamamos al método principal de nuestra instancia global
+        desplegables.syncAll();
+
+        Logger.log('✅ Prueba finalizada con éxito. Revisa tu Google Form.');
+    } catch (error) {
+        Logger.log('❌ Error en la prueba de desplegables: ' + error.message);
+    }
+}

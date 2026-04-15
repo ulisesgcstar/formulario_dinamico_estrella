@@ -29,19 +29,28 @@ class GestorDesplegables {
     }
 
     /**
-     * Extrae los valores únicos de una columna específica en una hoja catálogo.
-     * @private
-     */
+   * Extrae los valores únicos filtrando solo los que tengan ESTADO = TRUE.
+   * @private
+   */
     _fetchSourceData(hoja, columna) {
         const sourceSheet = this.spreadsheet.getSheetByName(hoja);
         const data = sourceSheet.getDataRange().getValues();
         const headers = data[0];
+
         const colIndex = headers.indexOf(columna);
+        const estadoIndex = headers.indexOf('ESTADO');
 
         if (colIndex === -1) throw new Error(`Columna "${columna}" no hallada en ${hoja}`);
 
-        // Extraemos los datos omitiendo encabezado y filtrando celdas vacías
         return data.slice(1)
+            .filter(row => {
+                // Si no existe columna ESTADO, se incluyen todos por defecto.
+                if (estadoIndex === -1) return true;
+
+                // Solo incluye si el valor es estrictamente TRUE (booleano o texto).
+                const valorEstado = row[estadoIndex];
+                return valorEstado === true || valorEstado === "TRUE";
+            })
             .map(row => row[colIndex])
             .filter(cell => cell !== "" && cell !== null);
     }

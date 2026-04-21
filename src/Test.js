@@ -32,3 +32,20 @@ function testSincronizarDesplegables() {
         Logger.log('❌ Error en la prueba de desplegables: ' + error.message);
     }
 }
+
+/**
+ * Prueba la construcción del núcleo dinámico.
+ * Verifica que el motor lea el ID_REVISION y cree los elementos en el Forms.
+ */
+function testConstruirMotor() {
+    try {
+        Logger.log('🚀 Iniciando prueba del Motor Constructor...');
+
+        // Ejecutamos el método principal
+        motor.construir();
+
+        Logger.log('✅ Prueba finalizada. Revisa tu Google Form para ver los cambios.');
+    } catch (error) {
+        Logger.log('❌ Error en la prueba del motor: ' + error.stack);
+    }
+}

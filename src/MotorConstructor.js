@@ -1,36 +1,37 @@
 /**
  * Clase encargada de interpretar el Sheets y construir el núcleo dinámico del Formulario.
- * Sigue un enfoque de inyección selectiva por grupos.
+ * Ajustado para filtrar por ID_REVISION y organizar por GRUPO_VISUAL.
  */
 class MotorConstructor {
     constructor() {
         // 1. Cargamos los punteros desde nuestra clase Config
         this.sheetName = config.get('HOJA_CAT_PREGUNTAS');
-        this.filtroGrupo = config.get('FILTRO_CONSTRUCCION_DINAMICA');
+        // Ahora el filtro es el ID de la revisión (ej: GTE-FMT-MTO-01)
+        this.filtroRevision = config.get('FILTRO_CONSTRUCCION_DINAMICA');
         this.formId = config.get('ID_FORMULARIO');
 
         // 2. Conexiones principales
         this.ss = SpreadsheetApp.getActiveSpreadsheet();
         this.form = FormApp.openById(this.formId);
 
-        // 3. Mapeo de columnas (Se autoejecuta para saber dónde está cada dato)
+        // 3. Mapeo de columnas (Se autoejecuta)
         this.cols = this._mapearColumnas();
     }
 
     /**
      * Identifica los índices de las columnas según su encabezado.
      * @private
-     * @returns {Object} Diccionario con nombres de columnas y su índice (0-based).
      */
     _mapearColumnas() {
         const sheet = this.ss.getSheetByName(this.sheetName);
         if (!sheet) throw new Error(`No existe la hoja: ${this.sheetName}`);
 
-        // Obtenemos solo la primera fila (headers)
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
+        // Añadimos ID_REVISION a las columnas requeridas
         const columnasRequeridas = [
             'ID_PREGUNTA',
+            'ID_REVISION', // <--- Nueva columna crítica para el filtro
             'GRUPO_VISUAL',
             'GRUPO_CUADRICULA',
             'TEXTO',
@@ -54,25 +55,26 @@ class MotorConstructor {
     }
 
     /**
-     * Filtra las filas de la hoja según el grupo visual y el estado activo.
+     * Filtra las filas de la hoja según el ID_REVISION y el estado activo.
      * @returns {Array<Object>} Lista de preguntas estructuradas.
      */
     obtenerPreguntasParaConstruir() {
         const sheet = this.ss.getSheetByName(this.sheetName);
-        const data = sheet.getDataRange().getValues().slice(1); // Quitamos encabezados
+        const data = sheet.getDataRange().getValues().slice(1);
 
-        // Aplicamos el filtro: Coincidencia de grupo Y que esté activo
+        // Ajustamos el filtro para usar ID_REVISION
         const filasFiltradas = data.filter((row) => {
-            const coincideGrupo = row[this.cols.GRUPO_VISUAL] === this.filtroGrupo;
+            const coincideRevision = row[this.cols.ID_REVISION] === this.filtroRevision;
             const estaActiva = row[this.cols.ESTADO] === true || row[this.cols.ESTADO] === 'TRUE';
-            return coincideGrupo && estaActiva;
+            return coincideRevision && estaActiva;
         });
 
-        Logger.log(`🔍 Motor: Se encontraron ${filasFiltradas.length} preguntas para el grupo: "${this.filtroGrupo}"`);
+        Logger.log(`🔍 Motor: Filtrando por Revisión: "${this.filtroRevision}". Encontradas: ${filasFiltradas.length}`);
 
-        // Transformamos las filas en objetos legibles para facilitar el siguiente paso
         return filasFiltradas.map((row) => ({
             id: row[this.cols.ID_PREGUNTA],
+            revision: row[this.cols.ID_REVISION],
+            grupoVisual: row[this.cols.GRUPO_VISUAL], // Lo guardamos para los PageBreaks
             gridId: row[this.cols.GRUPO_CUADRICULA],
             titulo: row[this.cols.TEXTO],
             ayuda: row[this.cols.TEXTO_AYUDA],
@@ -81,7 +83,70 @@ class MotorConstructor {
             obligatorio: row[this.cols.OBLIGATORIO],
         }));
     }
+
+    /**
+   * Ejecuta la construcción física de los elementos en el Formulario.
+   */
+    construir() {
+        const preguntas = this.obtenerPreguntasParaConstruir();
+        if (preguntas.length === 0) return Logger.log('⚠️ No hay preguntas para inyectar.');
+
+        let ultimoGrupo = null;
+
+        preguntas.forEach((p) => {
+            // 1. Lógica de Salto de Página (PageBreak)
+            // Si el grupo cambia, insertamos una nueva sección
+            if (p.grupoVisual !== ultimoGrupo) {
+                this.form.addPageBreakItem().setTitle(p.grupoVisual);
+                ultimoGrupo = p.grupoVisual;
+                Logger.log(`📖 Nueva Sección: ${p.grupoVisual}`);
+            }
+
+            // 2. Switch de Tipos: ¿Qué vamos a crear?
+            switch (p.tipo.toUpperCase()) {
+                case 'TEXT':
+                    this._crearPreguntaTexto(p);
+                    break;
+                case 'GRID':
+                    // La lógica de GRID es especial y la veremos en el siguiente paso
+                    Logger.log(`📦 Preparando Grid para ID: ${p.id}`);
+                    break;
+                case 'DATE':
+                    this._crearPreguntaFecha(p);
+                    break;
+                default:
+                    Logger.log(`⚠️ Tipo de control no soportado: ${p.tipo}`);
+            }
+        });
+
+        Logger.log('✅ Construcción finalizada.');
+    }
+
+    /**
+     * Crea una pregunta de respuesta corta.
+     * @private
+     */
+    _crearPreguntaTexto(p) {
+        const item = this.form.addTextItem();
+        item.setTitle(p.titulo)
+            .setHelpText(p.ayuda || '')
+            .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
+
+        Logger.log(`   📝 Creada Pregunta Texto: ${p.titulo}`);
+    }
+
+    /**
+     * Crea una pregunta de tipo Fecha.
+     * @private
+     */
+    _crearPreguntaFecha(p) {
+        const item = this.form.addDateItem();
+        item.setTitle(p.titulo)
+            .setHelpText(p.ayuda || '')
+            .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
+
+        Logger.log(`   📅 Creada Pregunta Fecha: ${p.titulo}`);
+    }
 }
 
-// Instancia global para ser usada en todo el proyecto
 const motor = new MotorConstructor();

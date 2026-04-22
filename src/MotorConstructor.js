@@ -93,26 +93,37 @@ class MotorConstructor {
 
         // Este "buzón" guardará las preguntas de tipo GRID agrupadas por nombre de grupo
         const bufferGrids = {};
+        const bufferCheckboxGrids = {};
 
         preguntas.forEach((p) => {
             const tipo = p.tipo.toUpperCase();
 
             if (tipo === 'GRID') {
-                // Si la pregunta es GRID, la guardamos en su grupo correspondiente
-                if (!bufferGrids[p.grupoVisual]) {
-                    bufferGrids[p.grupoVisual] = [];
-                }
+                if (!bufferGrids[p.grupoVisual]) bufferGrids[p.grupoVisual] = [];
                 bufferGrids[p.grupoVisual].push(p);
+            } else if (tipo === 'CHECKBOX_GRID') { // <--- NUEVO CASO
+                if (!bufferCheckboxGrids[p.grupoVisual]) bufferCheckboxGrids[p.grupoVisual] = [];
+                bufferCheckboxGrids[p.grupoVisual].push(p);
             } else if (tipo === 'TEXT') {
                 this._crearPreguntaTexto(p);
             } else if (tipo === 'DATE') {
                 this._crearPreguntaFecha(p);
+            } else if (tipo === 'PARAGRAPH') { // <--- NUEVO
+                this._crearPreguntaParrafo(p);
+            } else if (tipo === 'TIME') {      // <--- NUEVO
+                this._crearPreguntaHora(p);
+            } else if (tipo === 'LIST') {      // <--- NUEVO
+                this._crearPreguntaLista(p);
             }
         });
 
         // Una vez que terminamos el bucle, creamos UN solo Grid por cada grupo encontrado
         for (const nombreDelGrupo in bufferGrids) {
             this._crearGridAgrupado(nombreDelGrupo, bufferGrids[nombreDelGrupo]);
+        }
+
+        for (const nombreDelGrupo in bufferCheckboxGrids) { // <--- NUEVO PROCESO
+            this._crearCheckboxGridAgrupado(nombreDelGrupo, bufferCheckboxGrids[nombreDelGrupo]);
         }
 
         Logger.log('✅ Construcción finalizada.');
@@ -208,6 +219,61 @@ class MotorConstructor {
 
         Logger.log(`   📊 Cuadrícula agrupada creada: "${nombreDelGrupo}" con ${filas.length} filas.`);
     }
+    /**
+     * Crea una pregunta de respuesta larga (Párrafo).
+     * @private
+     */
+    _crearPreguntaParrafo(p) {
+        this.form.addParagraphTextItem()
+            .setTitle(p.titulo)
+            .setHelpText(p.ayuda || '')
+            .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
+        Logger.log(`   📝 Párrafo: ${p.titulo}`);
+    }
+
+    /**
+     * Crea una pregunta de selección de hora.
+     * @private
+     */
+    _crearPreguntaHora(p) {
+        this.form.addTimeItem()
+            .setTitle(p.titulo)
+            .setHelpText(p.ayuda || '')
+            .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
+        Logger.log(`   🕒 Hora: ${p.titulo}`);
+    }
+
+    /**
+     * Crea solo la estructura de una lista desplegable.
+     * Las opciones se llenan externamente con la lógica de catálogos.
+     * @private
+     */
+    _crearPreguntaLista(p) {
+        this.form.addListItem()
+            .setTitle(p.titulo)
+            .setHelpText(p.ayuda || '')
+            .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
+        Logger.log(`   📜 Lista (Estructura creada): ${p.titulo}`);
+    }
+
+    /**
+   * Crea una sola tabla de casillas de verificación (CheckboxGridItem).
+   * @private
+   */
+    _crearCheckboxGridAgrupado(nombreDelGrupo, listaDePreguntas) {
+        const escalaId = listaDePreguntas[0].escalaId;
+        const opciones = this._obtenerOpcionesEscala(escalaId);
+        const filas = listaDePreguntas.map(p => p.titulo);
+
+        const item = this.form.addCheckboxGridItem(); // <--- La diferencia clave
+        item.setTitle(nombreDelGrupo)
+            .setRows(filas)
+            .setColumns(opciones)
+            .setRequired(listaDePreguntas[0].obligatorio === true || listaDePreguntas[0].obligatorio === 'TRUE');
+
+        Logger.log(`   ☑️ Checkbox Grid agrupado: "${nombreDelGrupo}"`);
+    }
+
 }
 
 const motor = new MotorConstructor();

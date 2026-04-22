@@ -91,33 +91,29 @@ class MotorConstructor {
         const preguntas = this.obtenerPreguntasParaConstruir();
         if (preguntas.length === 0) return Logger.log('⚠️ No hay preguntas para inyectar.');
 
-        let ultimoGrupo = null;
+        // Este "buzón" guardará las preguntas de tipo GRID agrupadas por nombre de grupo
+        const bufferGrids = {};
 
         preguntas.forEach((p) => {
-            // 1. Lógica de Salto de Página (PageBreak)
-            // Si el grupo cambia, insertamos una nueva sección
-            if (p.grupoVisual !== ultimoGrupo) {
-                this.form.addPageBreakItem().setTitle(p.grupoVisual);
-                ultimoGrupo = p.grupoVisual;
-                Logger.log(`📖 Nueva Sección: ${p.grupoVisual}`);
-            }
+            const tipo = p.tipo.toUpperCase();
 
-            // 2. Switch de Tipos: ¿Qué vamos a crear?
-            switch (p.tipo.toUpperCase()) {
-                case 'TEXT':
-                    this._crearPreguntaTexto(p);
-                    break;
-                case 'GRID':
-                    // La lógica de GRID es especial y la veremos en el siguiente paso
-                    Logger.log(`📦 Preparando Grid para ID: ${p.id}`);
-                    break;
-                case 'DATE':
-                    this._crearPreguntaFecha(p);
-                    break;
-                default:
-                    Logger.log(`⚠️ Tipo de control no soportado: ${p.tipo}`);
+            if (tipo === 'GRID') {
+                // Si la pregunta es GRID, la guardamos en su grupo correspondiente
+                if (!bufferGrids[p.grupoVisual]) {
+                    bufferGrids[p.grupoVisual] = [];
+                }
+                bufferGrids[p.grupoVisual].push(p);
+            } else if (tipo === 'TEXT') {
+                this._crearPreguntaTexto(p);
+            } else if (tipo === 'DATE') {
+                this._crearPreguntaFecha(p);
             }
         });
+
+        // Una vez que terminamos el bucle, creamos UN solo Grid por cada grupo encontrado
+        for (const nombreDelGrupo in bufferGrids) {
+            this._crearGridAgrupado(nombreDelGrupo, bufferGrids[nombreDelGrupo]);
+        }
 
         Logger.log('✅ Construcción finalizada.');
     }
@@ -146,6 +142,71 @@ class MotorConstructor {
             .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
 
         Logger.log(`   📅 Creada Pregunta Fecha: ${p.titulo}`);
+    }
+
+    /**
+   * Crea una cuadrícula (Grid) o añade una fila a una existente.
+   * @private
+   */
+    _crearPreguntaGrid(p) {
+        // 1. Obtenemos las opciones (columnas) desde la hoja de escalas
+        const opciones = this._obtenerOpcionesEscala(p.escalaId);
+
+        // 2. Creamos el Grid Item
+        // NOTA: En esta versión simple, cada pregunta GRID crea su propia tabla.
+        // Si quisieras agrupar varias preguntas en una sola tabla, 
+        // se compararía el gridId con el anterior (similar a la lógica de secciones).
+        const item = this.form.addGridItem();
+
+        item.setTitle(p.titulo)
+            .setHelpText(p.ayuda || '')
+            .setRows([p.titulo]) // La pregunta es la fila
+            .setColumns(opciones) // La escala son las columnas
+            .setRequired(p.obligatorio === true || p.obligatorio === 'TRUE');
+
+        Logger.log(`   📊 Creada Cuadrícula (1 fila): ${p.id}`);
+    }
+
+    /**
+     * Busca en CAT_ESCALAS y devuelve un array de strings.
+     * @private
+     * @param {string} escalaId ID a buscar (ej: 'C-NC-NA')
+     */
+    _obtenerOpcionesEscala(escalaId) {
+        const sheetEscalas = this.ss.getSheetByName('CAT_ESCALAS');
+        const data = sheetEscalas.getDataRange().getValues();
+
+        // Buscamos la fila que coincida con el ID_ESCALA
+        const filaEscala = data.find(row => row[0] === escalaId);
+
+        if (!filaEscala) {
+            Logger.log(`⚠️ No se encontró la escala "${escalaId}". Usando opciones por defecto.`);
+            return ['SÍ', 'NO', 'N/A'];
+        }
+
+        // El valor viene como "C, NC, NA", lo convertimos en ["C", "NC", "NA"]
+        return filaEscala[1].split(',').map(opcion => opcion.trim());
+    }
+    /**
+ * Toma un grupo de preguntas y crea una sola tabla (GridItem).
+ * @private
+ */
+    _crearGridAgrupado(nombreDelGrupo, listaDePreguntas) {
+        // 1. Obtenemos la escala (usamos la del primer elemento del grupo)
+        const escalaId = listaDePreguntas[0].escalaId;
+        const opciones = this._obtenerOpcionesEscala(escalaId);
+
+        // 2. Extraemos solo los textos de las preguntas para que sean las filas
+        const filas = listaDePreguntas.map(p => p.titulo);
+
+        // 3. Creamos el elemento en el Formulario
+        const item = this.form.addGridItem();
+        item.setTitle(nombreDelGrupo) // El título de la tabla es el GRUPO_VISUAL
+            .setRows(filas)           // Todas las preguntas del grupo son las filas
+            .setColumns(opciones)     // La escala son las columnas
+            .setRequired(listaDePreguntas[0].obligatorio === true || listaDePreguntas[0].obligatorio === 'TRUE');
+
+        Logger.log(`   📊 Cuadrícula agrupada creada: "${nombreDelGrupo}" con ${filas.length} filas.`);
     }
 }
 

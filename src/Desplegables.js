@@ -73,4 +73,4 @@ class GestorDesplegables {
 }
 
 // Instancia global
-const desplegables = new GestorDesplegables();
+//const desplegables = new GestorDesplegables();

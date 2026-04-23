@@ -276,4 +276,4 @@ class MotorConstructor {
 
 }
 
-const motor = new MotorConstructor();
+//const motor = new MotorConstructor();
